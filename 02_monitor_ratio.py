@@ -21,39 +21,31 @@ def lunes(dia):
     return dia - timedelta(days=dia.weekday())
 
 
-def simular(eventos, vigilar, excluir_fallos):
+def simular(eventos, excluir_fallos):
     consultas, pagos = Counter(), Counter()
     controles, omitidas = [], []
     estado, detecciones = {}, {}
-    modo = "normal"
     dia_control = eventos[0][0].date()
 
     def controlar(dia):
         semana = lunes(dia)
         q, p = consultas[semana], pagos[semana]
         ratio = q / p if p else None
-        anterior = modo_actual = modo
-        escalar = False
-        if vigilar:
-            if ratio is None:
-                modo_actual = "restringido" if q else "normal"
-                escalar = q > 0
-            elif ratio >= ALERTA:
-                modo_actual = "restringido"
-                escalar = ratio >= LIMITE
-            elif ratio < ALERTA - 0.5:
-                modo_actual = "normal"
+        if not p:
+            nivel = "escalar" if q else "sin actividad"
+        elif ratio >= LIMITE:
+            nivel = "escalar" if ratio > LIMITE else "límite alcanzado"
+        else:
+            nivel = "preventiva" if ratio >= ALERTA else "normal"
         controles.append({
             "fecha": dia, "semana": semana, "consultas": q, "pagos": p,
-            "ratio": ratio, "modo_anterior": anterior, "modo": modo_actual,
-            "escalar": escalar,
+            "ratio": ratio, "nivel": nivel,
         })
-        return modo_actual
 
     for momento, tipo, identificador, fila in eventos:
         dia = momento.date()
         while dia_control <= dia:
-            modo = controlar(dia_control)
+            controlar(dia_control)
             dia_control += timedelta(days=1)
 
         semana = lunes(dia)
@@ -65,25 +57,22 @@ def simular(eventos, vigilar, excluir_fallos):
             estado.pop(cuenta, None)
             continue
 
-        ultima, vence, respuesta = estado.get(cuenta, (None, None, None))
+        ultima, vence = estado.get(cuenta, (None, None))
         intervalo = 48
         if dia.day <= 14 and vence is None and convenio != "CONV-LUZ":
             intervalo = 72 if convenio == "CONV-TV" else 96
-        if ultima is not None:
-            if vence is not None and dia < vence - timedelta(days=1):
-                continue
-            if vence is None and momento - ultima < timedelta(hours=intervalo):
-                continue
-            # Solo se difiere una búsqueda que sería elegible en el calendario base.
-            if (modo == "restringido" and vence is None and respuesta == "sin_deuda"
-                    and fila["origen"] == "programada" and convenio != "CONV-LUZ"
-                    and momento - ultima < timedelta(hours=intervalo + 24)):
-                omitidas.append({
-                    "fecha_hora": momento.isoformat(), "semana": semana, "consulta_id": identificador,
-                    "convenio": convenio, "cuenta": cuenta[1], "intervalo_base_h": intervalo,
-                    "intervalo_restringido_h": intervalo + 24, "motivo": "Última respuesta sin deuda",
-                })
-                continue
+        motivo = None
+        if vence is not None and dia < vence - timedelta(days=1):
+            motivo = "Deuda conocida"
+        elif vence is None and ultima is not None and momento - ultima < timedelta(hours=intervalo):
+            motivo = "Intervalo de búsqueda"
+        if motivo:
+            omitidas.append({
+                "fecha_hora": momento.isoformat(), "semana": semana, "consulta_id": identificador,
+                "convenio": convenio, "cuenta": cuenta[1], "intervalo_base_h": intervalo,
+                "motivo": motivo,
+            })
+            continue
 
         resultado = fila["resultado"]
         if not excluir_fallos or resultado not in FALLOS:
@@ -93,7 +82,7 @@ def simular(eventos, vigilar, excluir_fallos):
             detecciones.setdefault((*cuenta, vence), momento)
         elif resultado not in FALLOS:
             vence = None
-        estado[cuenta] = (momento, vence, resultado)
+        estado[cuenta] = (momento, vence)
 
     return consultas, pagos, detecciones, controles, omitidas
 
@@ -127,8 +116,7 @@ def main():
     )
     historico = Counter(lunes(datetime.fromisoformat(r["timestamp"]).date()) for r in consultas
                         if not args.excluir_fallos or r["resultado"] not in FALLOS)
-    base, _, detectadas_base, _, _ = simular(eventos, False, args.excluir_fallos)
-    monitor, por_semana, detectadas, controles, omitidas = simular(eventos, True, args.excluir_fallos)
+    propuesta, por_semana, _, controles, omitidas = simular(eventos, args.excluir_fallos)
 
     args.salida.mkdir(parents=True, exist_ok=True)
     semanas = [INICIO + timedelta(weeks=i) for i in range((FIN - INICIO).days // 7 + 1)]
@@ -136,7 +124,7 @@ def main():
     for semana in semanas:
         p = por_semana[semana]
         fila = {"semana": semana, "pagos": p}
-        for nombre, conteo in [("historico", historico), ("base", base), ("monitor", monitor)]:
+        for nombre, conteo in [("historico", historico), ("propuesta", propuesta)]:
             q = conteo[semana]
             fila[f"consultas_{nombre}"] = q
             fila[f"ratio_{nombre}"] = round(q / p, 6) if p else None
@@ -144,37 +132,18 @@ def main():
         resumen.append(fila)
     guardar(args.salida / "resumen_semanal.csv", resumen)
     guardar(args.salida / "controles_diarios.csv", controles)
-    guardar(args.salida / "consultas_diferidas.csv", omitidas,
+    guardar(args.salida / "consultas_omitidas.csv", omitidas,
             ["fecha_hora", "semana", "consulta_id", "convenio", "cuenta",
-             "intervalo_base_h", "intervalo_restringido_h", "motivo"])
-    calidad = []
-    for clave, original in detectadas_base.items():
-        if not INICIO <= original.date() <= FIN:
-            continue
-        nueva = detectadas.get(clave)
-        if nueva == original:
-            continue
-        calidad.append({
-            "convenio": clave[0], "cuenta": clave[1], "vencimiento": clave[2],
-            "primera_base": original.isoformat(), "primera_monitor": nueva.isoformat() if nueva else None,
-            "horas_de_demora": (nueva - original).total_seconds() / 3600 if nueva else None,
-            "detectada_antes_de_vencer": nueva.date() < clave[2] if nueva else None,
-        })
-    guardar(args.salida / "impacto_deteccion.csv", calidad,
-            ["convenio", "cuenta", "vencimiento", "primera_base", "primera_monitor",
-             "horas_de_demora", "detectada_antes_de_vencer"])
+             "intervalo_base_h", "motivo"])
 
     total_pagos = sum(por_semana[s] for s in semanas)
-    for nombre in ("historico", "base", "monitor"):
+    for nombre in ("historico", "propuesta"):
         q = sum(r[f"consultas_{nombre}"] for r in resumen)
         cumplen = sum(r[f"cumple_{nombre}"] is True for r in resumen)
         print(f"{nombre}: {q} consultas, {total_pagos} pagos, ratio {q / total_pagos:.2f}, "
               f"{cumplen}/{len(semanas)} semanas cumplen")
-    print(f"Diferidas en semanas completas: {sum(INICIO <= r['semana'] <= FIN for r in omitidas)}")
-    print(f"Cambios de detección: {len(calidad)}, ausentes: "
-          f"{sum(r['primera_monitor'] is None for r in calidad)}, "
-          f"detectadas el día de vencimiento o después: "
-          f"{sum(r['detectada_antes_de_vencer'] is False for r in calidad)}")
+    niveles = Counter(r["nivel"] for r in controles if INICIO <= r["fecha"] <= FIN)
+    print("Controles diarios:", dict(niveles))
 
 
 if __name__ == "__main__":
