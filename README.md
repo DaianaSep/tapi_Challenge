@@ -6,7 +6,6 @@
 - [Notebook de análisis](01_exploracion_datos.ipynb) · [Abrir en Colab](https://colab.research.google.com/github/DaianaSep/tapi_Challenge/blob/main/01_exploracion_datos.ipynb)
 - [Parte 2 · Diseño y resultados del monitor](Tapi_Challenge_Parte_2.md)
 - [Script del monitor](02_monitor_ratio.py)
-- [Tablero](Tablero_Tapi.pptx), [análisis de alternativas](Tapi_Analisis_y_alternativas.docx) y [propuesta de una página](Tapi_Propuesta_DeltaPay.docx)
 - [Enunciado](Challenge_Product_Operations_2.pdf) y archivos CSV en la raíz del repositorio.
 
 ## Ejecutar la simulación
