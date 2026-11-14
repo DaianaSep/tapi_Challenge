@@ -17,11 +17,11 @@ El monitor calcula al inicio de cada día el ratio de la semana en curso, de lun
 | Señal al iniciar el día | Acción |
 |---|---|
 | Ratio menor a 5 | Continuar con el calendario de la Parte 1. |
-| Ratio de 5 a menos de 6 | Registrar una alerta preventiva para que Operaciones revise el margen antes de llegar al límite. |
-| Ratio igual a 6 | Registrar que se alcanzó el límite. |
-| Ratio superior a 6 o consultas sin pagos | Escalar a Operaciones. Con cero pagos, el ratio queda indefinido. |
+| Ratio de 5 a menos de 6 | Activar el ajuste preventivo y registrar la alerta. El umbral deja una consulta por pago de margen frente al límite de 6. |
+| Ratio igual a 6 | Mantener el ajuste y registrar que se alcanzó el límite. |
+| Ratio superior a 6 o consultas sin pagos | Registrar el caso para Operaciones. Con ratio superior a 6 se mantiene el ajuste. Con cero pagos el ratio queda indefinido y se conserva el calendario base. |
 
-El calendario y la pausa por deuda conocida son los ajustes automáticos. Ante una alerta se registra el estado y cualquier cambio adicional de frecuencia queda a cargo de Operaciones.
+El ajuste suma 24 h al intervalo mínimo de búsqueda programada cuando la última respuesta fue sin deuda. Luz, las consultas de respaldo y la revalidación previa al pago conservan su tratamiento. Al siguiente control se vuelve al calendario base si el ratio baja de 5 o comienza una semana nueva. La simulación solo puede ejecutar el siguiente intento disponible en los CSV, así que 24 h describe el aumento del intervalo mínimo y la demora efectiva puede ser mayor.
 
 ## Cómo correrlo
 
@@ -34,22 +34,23 @@ python3 02_monitor_ratio.py --datos . --contar-fallos --salida resultados_con_fa
 
 Si los CSV están en `data/` junto al script, se puede omitir `--datos`. La simulación registra los avisos en CSV. Para un piloto habría que conectar el control diario al programador de consultas y al canal de avisos de Operaciones.
 
-- `controles_diarios.csv` guarda consultas, pagos, ratio y nivel de alerta.
-- `consultas_omitidas.csv` identifica cada intento omitido por el calendario o por deuda conocida.
-- `resumen_semanal.csv` permite comparar el histórico con la propuesta.
+- `controles_diarios.csv` guarda consultas, pagos, ratio, nivel de alerta y si se activó el ajuste.
+- `consultas_omitidas.csv` identifica cada intento omitido por el calendario, deuda conocida o ajuste preventivo.
+- `resumen_semanal.csv` compara el histórico, la propuesta y la propuesta con ajuste.
+- `impacto_deteccion.csv` registra cambios en la primera detección frente a la propuesta.
 
 ## Resultado sobre los tres meses
 
 Comparé las 12 semanas completas del 3 de agosto al 25 de octubre de 2026 sobre 1.343 pagos históricos en ambos escenarios.
 
-| Criterio de conteo | Consultas históricas | Consultas con la propuesta | Ratio histórico → propuesto | Semanas dentro del límite |
-|---|---:|---:|---:|---:|
-| Sin errores ni timeouts | 30.439 | 5.678 | 22,66 → **4,23** | 0/12 → **9/12** |
-| Todos los intentos | 34.602 | 6.002 | 25,76 → **4,47** | 0/12 → **7/12** |
+| Criterio | Histórico | Propuesta | Propuesta con ajuste |
+|---|---:|---:|---:|
+| Sin errores ni timeouts | 22,66 · 0/12 | 4,23 · 9/12 | 4,16 · 9/12 |
+| Todos los intentos | 25,76 · 0/12 | 4,47 · 7/12 | 4,39 · 9/12 |
 
-Con el criterio principal, el monitor registró siete alertas preventivas y 23 controles que requerían escalamiento en los 84 días evaluados. Los avisos se basan en el acumulado disponible cada mañana y el cumplimiento de la tabla se mide al cierre semanal.
+Cada celda muestra el ratio acumulado y las semanas con ratio de hasta 6. Sin fallos, el ajuste redujo de 5.678 a 5.588 las consultas computables. Se activó en 25 de 84 controles diarios y hubo 22 controles para escalar. Contando fallos, las semanas del 7 y el 28 de septiembre pasaron a cumplir.
 
-El ahorro estimado surge de aplicar el calendario y las pausas de la Parte 1. La simulación usa los horarios y respuestas disponibles en el histórico. Los resultados muestran el impacto en el ratio. La cobertura de facturas y la puntualidad de los pagos se medirían durante el piloto.
+Sin fallos, 188 facturas se detectaron más tarde y dos de TV dejaron de aparecer respecto de la propuesta. Entre las detecciones que cambiaron y siguieron observándose, ninguna cayó el día del vencimiento o después. Los pagos se mantienen fijos y los horarios disponibles son los del CSV. En el piloto se debe medir la cobertura y el pago a tiempo.
 """
 import argparse
 import csv
@@ -73,11 +74,13 @@ def lunes(dia):
     return dia - timedelta(days=dia.weekday())
 
 
-def simular(eventos, excluir_fallos):
+def simular(eventos, excluir_fallos, ajustar=False):
     consultas, pagos = Counter(), Counter()
     controles, omitidas = [], []
     estado, detecciones = {}, {}
     dia_control = eventos[0][0].date()
+
+    restringido = False
 
     def controlar(dia):
         semana = lunes(dia)
@@ -89,15 +92,18 @@ def simular(eventos, excluir_fallos):
             nivel = "escalar" if ratio > LIMITE else "límite alcanzado"
         else:
             nivel = "preventiva" if ratio >= ALERTA else "normal"
+        aplicar = ajustar and ratio is not None and ratio >= ALERTA
         controles.append({
             "fecha": dia, "semana": semana, "consultas": q, "pagos": p,
-            "ratio": ratio, "nivel": nivel,
+            "ratio": ratio, "nivel": nivel, "ajuste_activo": aplicar,
         })
+
+        return aplicar
 
     for momento, tipo, identificador, fila in eventos:
         dia = momento.date()
         while dia_control <= dia:
-            controlar(dia_control)
+            restringido = controlar(dia_control)
             dia_control += timedelta(days=1)
 
         semana = lunes(dia)
@@ -109,7 +115,7 @@ def simular(eventos, excluir_fallos):
             estado.pop(cuenta, None)
             continue
 
-        ultima, vence = estado.get(cuenta, (None, None))
+        ultima, vence, respuesta = estado.get(cuenta, (None, None, None))
         intervalo = 48
         if dia.day <= 14 and vence is None and convenio != "CONV-LUZ":
             intervalo = 72 if convenio == "CONV-TV" else 96
@@ -118,11 +124,17 @@ def simular(eventos, excluir_fallos):
             motivo = "Deuda conocida"
         elif vence is None and ultima is not None and momento - ultima < timedelta(hours=intervalo):
             motivo = "Intervalo de búsqueda"
+        adicional = 0
+        if (motivo is None and restringido and vence is None and respuesta == "sin_deuda"
+                and convenio != "CONV-LUZ" and fila["origen"] == "programada"
+                and momento - ultima < timedelta(hours=intervalo + 24)):
+            motivo = "Ajuste por ratio"
+            adicional = 24
         if motivo:
             omitidas.append({
                 "fecha_hora": momento.isoformat(), "semana": semana, "consulta_id": identificador,
                 "convenio": convenio, "cuenta": cuenta[1], "intervalo_base_h": intervalo,
-                "motivo": motivo,
+                "motivo": motivo, "horas_adicionales": adicional,
             })
             continue
 
@@ -134,7 +146,7 @@ def simular(eventos, excluir_fallos):
             detecciones.setdefault((*cuenta, vence), momento)
         elif resultado not in FALLOS:
             vence = None
-        estado[cuenta] = (momento, vence)
+        estado[cuenta] = (momento, vence, resultado)
 
     return consultas, pagos, detecciones, controles, omitidas
 
@@ -168,7 +180,10 @@ def main():
     )
     historico = Counter(lunes(datetime.fromisoformat(r["timestamp"]).date()) for r in consultas
                         if not args.excluir_fallos or r["resultado"] not in FALLOS)
-    propuesta, por_semana, _, controles, omitidas = simular(eventos, args.excluir_fallos)
+    propuesta, _, detecciones_base, _, _ = simular(eventos, args.excluir_fallos)
+    monitor, por_semana, detecciones, controles, omitidas = simular(
+        eventos, args.excluir_fallos, ajustar=True
+    )
 
     args.salida.mkdir(parents=True, exist_ok=True)
     semanas = [INICIO + timedelta(weeks=i) for i in range((FIN - INICIO).days // 7 + 1)]
@@ -176,7 +191,7 @@ def main():
     for semana in semanas:
         p = por_semana[semana]
         fila = {"semana": semana, "pagos": p}
-        for nombre, conteo in [("historico", historico), ("propuesta", propuesta)]:
+        for nombre, conteo in [("historico", historico), ("propuesta", propuesta), ("monitor", monitor)]:
             q = conteo[semana]
             fila[f"consultas_{nombre}"] = q
             fila[f"ratio_{nombre}"] = round(q / p, 6) if p else None
@@ -186,16 +201,41 @@ def main():
     guardar(args.salida / "controles_diarios.csv", controles)
     guardar(args.salida / "consultas_omitidas.csv", omitidas,
             ["fecha_hora", "semana", "consulta_id", "convenio", "cuenta",
-             "intervalo_base_h", "motivo"])
+             "intervalo_base_h", "motivo", "horas_adicionales"])
+
+    cambios = []
+    for clave, original in detecciones_base.items():
+        convenio, cuenta, vence = clave
+        nueva = detecciones.get(clave)
+        if not INICIO <= original.date() <= FIN or nueva == original:
+            continue
+        cambios.append({
+            "convenio": convenio, "cuenta": cuenta, "vencimiento": vence,
+            "deteccion_base": original.isoformat(),
+            "deteccion_monitor": nueva.isoformat() if nueva else None,
+            "demora_h": round((nueva - original).total_seconds() / 3600, 2) if nueva else None,
+            "margen_dias": (vence - nueva.date()).days if nueva else None,
+        })
+    guardar(args.salida / "impacto_deteccion.csv", cambios,
+            ["convenio", "cuenta", "vencimiento", "deteccion_base",
+             "deteccion_monitor", "demora_h", "margen_dias"])
 
     total_pagos = sum(por_semana[s] for s in semanas)
-    for nombre in ("historico", "propuesta"):
+    for nombre in ("historico", "propuesta", "monitor"):
         q = sum(r[f"consultas_{nombre}"] for r in resumen)
         cumplen = sum(r[f"cumple_{nombre}"] is True for r in resumen)
         print(f"{nombre}: {q} consultas, {total_pagos} pagos, ratio {q / total_pagos:.2f}, "
               f"{cumplen}/{len(semanas)} semanas cumplen")
     niveles = Counter(r["nivel"] for r in controles if INICIO <= r["fecha"] <= FIN)
     print("Controles diarios:", dict(niveles))
+    print("Días con ajuste:", sum(r["ajuste_activo"] for r in controles
+                                  if INICIO <= r["fecha"] <= FIN))
+    print("Intentos postergados por el monitor:", sum(r["horas_adicionales"] > 0
+          for r in omitidas if INICIO <= r["semana"] <= FIN))
+    print("Detecciones demoradas:", sum((r["demora_h"] or 0) > 0 for r in cambios))
+    print("Detecciones ausentes:", sum(r["deteccion_monitor"] is None for r in cambios))
+    print("Detecciones cambiadas en o después del vencimiento:",
+          sum(r["margen_dias"] <= 0 for r in cambios if r["margen_dias"] is not None))
 
 
 if __name__ == "__main__":
