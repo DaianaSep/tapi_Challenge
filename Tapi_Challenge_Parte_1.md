@@ -27,19 +27,17 @@ Aceptaría probar intervalos mayores en un piloto acotado y medir el tiempo entr
 
 Si DeltaPay acepta lotes y cuenta por llamada, **hasta cinco cuentas por lote** llevarían el ratio a **2,01** y el cumplimiento a **11 de 12 semanas**. Pagar de inmediato las facturas autorizadas al detectarlas llevaría el ratio a **4,10**, con **9 de 12 semanas**. Estimé ambas opciones por separado, excluyendo errores y *timeouts*.
 
-### Contingencia en la primera semana del mes
+### Contingencia en la semana que contiene el día 1
 
-Probé una ventana de contingencia del **primer lunes de cada mes al domingo siguiente**. Operaciones decide si activa el cupo y cuántas búsquedas autoriza. El cupo se distribuye entre los siete días e incluye Luz. El respaldo de deudas conocidas y la revalidación antes del pago conservan sus reglas.
+La ventana va del lunes al domingo de la semana que contiene el **día 1 de cada mes**, aunque empiece en el mes anterior. Operaciones decide si activa el cupo y cuántas búsquedas autoriza, incluidas las de Luz. El respaldo de deudas conocidas y la revalidación conservan sus reglas.
 
-| Primera semana completa | Cupo simulado | Consultas computables | Pagos históricos | Ratio |
-|---|---:|---:|---:|---:|
-| 3–9 de agosto | 40 | 43 | 8 | **5,38** |
-| 7–13 de septiembre | Sin cupo | 426 | 76 | **5,61** |
-| 5–11 de octubre | 210 | 234 | 42 | **5,57** |
+| Mes | Semana elegible | Decisión en la simulación |
+|---|---|---|
+| Agosto | 27 de julio–2 de agosto | Semana incompleta en el histórico |
+| Septiembre | 31 de agosto–6 de septiembre | Cupo de 200 búsquedas |
+| Octubre | 28 de septiembre–4 de octubre | Sin cupo. El monitor ya estaba dentro del límite |
 
-**Qué encontré.** Con esta regla, el período pasó de 9 a **11 de 12 semanas** dentro del límite. La semana del 31 de agosto queda fuera de la ventana y cerró en **9,03**. De las facturas que el monitor detectaba en las dos semanas con cupo, 74 se detectaron en semanas posteriores y 5 quedaron sin detección observable.
-
-Los cupos son valores elegidos con el histórico. La simulación mantiene las fechas de pago y excluye errores y timeouts. Con cero pagos, el ratio queda indefinido.
+Con el cupo de 200, la semana de inicio de septiembre pasó de **8,98 a 5,93** (237 consultas computables y 40 pagos). La semana siguiente subió de **5,59 a 6,20** y el período quedó en **9 de 12 semanas** dentro del límite. De las 29 facturas que el monitor detectaba en la semana con cupo, 13 se detectaron esa semana y 16 más adelante. La simulación mantiene fijas las fechas de pago y excluye errores y timeouts.
 
 ## Email to DeltaPay
 

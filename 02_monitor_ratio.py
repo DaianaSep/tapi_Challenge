@@ -39,22 +39,19 @@ Si los CSV están en `data/` junto al script, se puede omitir `--datos`. La simu
 - `resumen_semanal.csv` compara el histórico, la propuesta y la propuesta con ajuste.
 - `impacto_deteccion.csv` registra cambios en la primera detección frente a la propuesta.
 
-## Contingencia en la primera semana del mes
+## Contingencia en la semana que contiene el día 1
 
-La ventana de contingencia va del primer lunes de cada mes al domingo siguiente. Operaciones
-decide si autoriza el cupo y cuántas búsquedas programadas permite. El cupo se distribuye entre
-los siete días e incluye Luz. El respaldo de deudas conocidas y la revalidación conservan
-sus reglas. Con cero pagos, el ratio queda indefinido.
+La ventana va del lunes al domingo de la semana que contiene el **día 1 de cada mes**, aunque empiece en el mes anterior. Operaciones decide si activa el cupo y cuántas búsquedas autoriza, incluidas las de Luz. El respaldo de deudas conocidas y la revalidación conservan sus reglas.
 
-```bash
-python3 02_monitor_ratio.py --semana-cupo 2026-08-03=40 --semana-cupo 2026-10-05=210
-```
+| Mes | Semana elegible | Decisión en la simulación |
+|---|---|---|
+| Agosto | 27 de julio–2 de agosto | Semana incompleta en el histórico |
+| Septiembre | 31 de agosto–6 de septiembre | Cupo de 200 búsquedas |
+| Octubre | 28 de septiembre–4 de octubre | Sin cupo. El monitor ya estaba dentro del límite |
 
-Con los pagos históricos fijos y tal como se cuentan las consultas en el escenario principal,
-el ratio fue de 5,38 en agosto, 5,61 en septiembre sin cupo y 5,57 en octubre. El período pasó
-de 9 a 11 de 12 semanas dentro del límite. La semana del 31 de agosto, fuera de la ventana,
-cerró en 9,03. Los cupos son valores de simulación. Para correr otros períodos con sus CSV,
-indicá `--desde` y `--hasta` con las fechas inicial y final del período.
+Con el cupo de 200, la semana de inicio de septiembre pasó de **8,98 a 5,93** (237 consultas computables y 40 pagos). La semana siguiente subió de **5,59 a 6,20** y el período quedó en **9 de 12 semanas** dentro del límite. De las 29 facturas que el monitor detectaba en la semana con cupo, 13 se detectaron esa semana y 16 más adelante. La simulación mantiene fijas las fechas de pago y excluye errores y timeouts.
+
+Ejecutar con `--semana-cupo 2026-08-31=200`. Para otros períodos, usar los CSV correspondientes e indicar `--desde` y `--hasta`.
 
 ## Resultado sobre los tres meses
 
@@ -92,7 +89,7 @@ def lunes(dia):
 
 
 def primera_semana_mes(semana):
-    return semana.weekday() == 0 and semana.day <= 7
+    return semana.weekday() == 0 and (semana.day == 1 or (semana + timedelta(days=6)).month != semana.month)
 
 
 def intervalo_busqueda(dia, convenio):
@@ -111,7 +108,7 @@ def simular(eventos, excluir_fallos, ajustar=False, cupos=None):
     agenda_diaria = {}
     seleccion = set()
     if cupos and any(not primera_semana_mes(semana) for semana in cupos):
-        raise ValueError("El cupo requiere el primer lunes de un mes.")
+        raise ValueError("El cupo requiere el lunes de la semana que contiene el día 1.")
     if cupos:
         for momento, tipo, identificador, fila in eventos:
             dia = momento.date()
@@ -226,7 +223,7 @@ def main():
     parser.add_argument("--hasta", type=date.fromisoformat, default=FIN,
                         help="Último domingo del período a evaluar.")
     parser.add_argument("--semana-cupo", action="append", default=[], metavar="AAAA-MM-DD[=CUPO]",
-                        help="Cupo aprobado para el primer lunes del mes. Repetir para otros meses.")
+                        help="Cupo aprobado para la semana que contiene el día 1. Repetir para otros meses.")
     conteo = parser.add_mutually_exclusive_group()
     conteo.add_argument("--excluir-fallos", dest="excluir_fallos", action="store_true",
                         help="Excluye errores y timeouts del ratio (valor por defecto).")
@@ -246,7 +243,7 @@ def main():
         except ValueError:
             parser.error("--semana-cupo requiere AAAA-MM-DD o AAAA-MM-DD=CUPO.")
         if not primera_semana_mes(semana) or not desde <= semana <= hasta:
-            parser.error("--semana-cupo debe indicar el primer lunes de un mes dentro del período.")
+            parser.error("--semana-cupo debe indicar el lunes de la semana que contiene el día 1 dentro del período.")
         if presupuesto <= 0 or semana in cupos:
             parser.error("Cada semana debe aparecer una vez y tener un cupo positivo.")
         cupos[semana] = presupuesto
