@@ -39,19 +39,21 @@ Si los CSV están en `data/` junto al script, se puede omitir `--datos`. La simu
 - `resumen_semanal.csv` compara el histórico, la propuesta y la propuesta con ajuste.
 - `impacto_deteccion.csv` registra cambios en la primera detección frente a la propuesta.
 
-## Contingencia en la semana que contiene el día 1
+## Contingencia del 1 al 7 de cada mes
 
-La ventana va del lunes al domingo de la semana que contiene el **día 1 de cada mes**, aunque empiece en el mes anterior. Operaciones decide si activa el cupo y cuántas búsquedas autoriza, incluidas las de Luz. El respaldo de deudas conocidas y la revalidación conservan sus reglas.
+Operaciones decide si activa un cupo de búsquedas del **día 1 al 7 inclusive**, aunque la ventana cruce dos semanas. El cupo incluye Luz y se reparte entre los siete días. El respaldo de deudas conocidas y la revalidación mantienen sus reglas. El ratio se sigue midiendo de lunes a domingo.
 
-| Mes | Semana elegible | Decisión en la simulación |
-|---|---|---|
-| Agosto | 27 de julio–2 de agosto | Semana incompleta en el histórico |
-| Septiembre | 31 de agosto–6 de septiembre | Cupo de 200 búsquedas |
-| Octubre | 28 de septiembre–4 de octubre | Sin cupo. El monitor ya estaba dentro del límite |
+Probé cupos de 40 búsquedas en agosto, 200 en septiembre y 210 en octubre. Los cupos son valores de simulación. Se mantienen las fechas históricas de pago y se excluyen errores y timeouts.
 
-Con el cupo de 200, la semana de inicio de septiembre pasó de **8,98 a 5,93** (237 consultas computables y 40 pagos). La semana siguiente subió de **5,59 a 6,20** y el período quedó en **9 de 12 semanas** dentro del límite. De las 29 facturas que el monitor detectaba en la semana con cupo, 13 se detectaron esa semana y 16 más adelante. La simulación mantiene fijas las fechas de pago y excluye errores y timeouts.
+| Semana desde | Ratio del monitor | Ratio con cupo |
+|---|---:|---:|
+| 3 de agosto | 39,75 | 28,00 |
+| 31 de agosto | 8,98 | 6,60 |
+| 5 de octubre | 9,17 | 8,07 |
 
-Ejecutar con `--semana-cupo 2026-08-31=200`. Para otros períodos, usar los CSV correspondientes e indicar `--desde` y `--hasta`.
+El ratio acumulado bajó de 4,16 a 3,97 y se mantuvieron 9 de 12 semanas dentro del límite. En agosto y octubre, las semanas con pocos pagos incluyen días posteriores al 7. Entre las facturas detectadas por el monitor del día 1 al 7, 77 se detectaron después del día 7 y 14 quedaron sin detección observable con los cupos.
+
+Ejecutar con `--mes-cupo 2026-08-01=40 --mes-cupo 2026-09-01=200 --mes-cupo 2026-10-01=210`. Para otros períodos, indicar `--desde` y `--hasta`.
 
 ## Resultado sobre los tres meses
 
@@ -88,10 +90,6 @@ def lunes(dia):
     return dia - timedelta(days=dia.weekday())
 
 
-def primera_semana_mes(semana):
-    return semana.weekday() == 0 and (semana.day == 1 or (semana + timedelta(days=6)).month != semana.month)
-
-
 def intervalo_busqueda(dia, convenio):
     if dia.day <= 14 and convenio != "CONV-LUZ":
         return 72 if convenio == "CONV-TV" else 96
@@ -107,18 +105,22 @@ def simular(eventos, excluir_fallos, ajustar=False, cupos=None):
     restringido = False
     agenda_diaria = {}
     seleccion = set()
-    if cupos and any(not primera_semana_mes(semana) for semana in cupos):
-        raise ValueError("El cupo requiere el lunes de la semana que contiene el día 1.")
-    if cupos:
+    cupos_diarios = {}
+    for mes, presupuesto in (cupos or {}).items():
+        if mes.day != 1:
+            raise ValueError("El cupo requiere el día 1 del mes.")
+        base, resto = divmod(presupuesto, 7)
+        for indice in range(7):
+            cupos_diarios[mes + timedelta(days=indice)] = base + (indice < resto)
+    if cupos_diarios:
         for momento, tipo, identificador, fila in eventos:
             dia = momento.date()
-            if tipo == 1 and lunes(dia) in cupos and fila["origen"] == "programada":
+            if tipo == 1 and dia in cupos_diarios and fila["origen"] == "programada":
                 cuenta = (fila["convenio"], fila["account_id"])
                 agenda_diaria.setdefault(dia, {}).setdefault(cuenta, (momento, identificador))
 
     def seleccionar_busquedas(dia):
-        base, resto = divmod(cupos[lunes(dia)], 7)
-        cupo = base + (dia.weekday() < resto)
+        cupo = cupos_diarios[dia]
         if cupo == 0:
             return set()
         elegidas = set()
@@ -156,7 +158,7 @@ def simular(eventos, excluir_fallos, ajustar=False, cupos=None):
         dia = momento.date()
         while dia_control <= dia:
             restringido = controlar(dia_control)
-            if cupos and lunes(dia_control) in cupos:
+            if dia_control in cupos_diarios:
                 seleccion = seleccionar_busquedas(dia_control)
             dia_control += timedelta(days=1)
 
@@ -182,7 +184,7 @@ def simular(eventos, excluir_fallos, ajustar=False, cupos=None):
                 and momento - ultima < timedelta(hours=intervalo + 24)):
             motivo = "Ajuste por ratio"
             adicional = 24
-        if motivo is None and cupos and semana in cupos and vence is None and identificador not in seleccion:
+        if motivo is None and dia in cupos_diarios and vence is None and identificador not in seleccion:
             motivo = "Cupo diario de búsquedas"
         if motivo:
             omitidas.append({
@@ -222,8 +224,8 @@ def main():
                         help="Primer lunes del período a evaluar.")
     parser.add_argument("--hasta", type=date.fromisoformat, default=FIN,
                         help="Último domingo del período a evaluar.")
-    parser.add_argument("--semana-cupo", action="append", default=[], metavar="AAAA-MM-DD[=CUPO]",
-                        help="Cupo aprobado para la semana que contiene el día 1. Repetir para otros meses.")
+    parser.add_argument("--mes-cupo", action="append", default=[], metavar="AAAA-MM-01=CUPO",
+                        help="Cupo aprobado para los días 1 a 7. Repetir para otros meses.")
     conteo = parser.add_mutually_exclusive_group()
     conteo.add_argument("--excluir-fallos", dest="excluir_fallos", action="store_true",
                         help="Excluye errores y timeouts del ratio (valor por defecto).")
@@ -235,18 +237,18 @@ def main():
     if desde.weekday() != 0 or hasta.weekday() != 6 or desde > hasta:
         parser.error("--desde y --hasta deben delimitar semanas completas, de lunes a domingo.")
     cupos = {}
-    for opcion in args.semana_cupo:
-        fecha, separador, cupo = opcion.partition("=")
+    for opcion in args.mes_cupo:
+        fecha, _, cupo = opcion.partition("=")
         try:
-            semana = date.fromisoformat(fecha)
-            presupuesto = int(cupo) if separador else 40
+            mes = date.fromisoformat(fecha)
+            presupuesto = int(cupo)
         except ValueError:
-            parser.error("--semana-cupo requiere AAAA-MM-DD o AAAA-MM-DD=CUPO.")
-        if not primera_semana_mes(semana) or not desde <= semana <= hasta:
-            parser.error("--semana-cupo debe indicar el lunes de la semana que contiene el día 1 dentro del período.")
-        if presupuesto <= 0 or semana in cupos:
-            parser.error("Cada semana debe aparecer una vez y tener un cupo positivo.")
-        cupos[semana] = presupuesto
+            parser.error("--mes-cupo requiere AAAA-MM-01=CUPO.")
+        if mes.day != 1 or mes > hasta or mes + timedelta(days=6) < desde:
+            parser.error("--mes-cupo debe indicar el día 1 de un mes cuya ventana toque el período.")
+        if presupuesto <= 0 or mes in cupos:
+            parser.error("Cada mes debe aparecer una vez y tener un cupo positivo.")
+        cupos[mes] = presupuesto
     consultas = [r for r in leer(args.datos, "consultas") if r["proveedor"] == "deltapay"]
     convenios = {r["convenio"] for r in consultas}
     pagos = [r for r in leer(args.datos, "pagos") if r["convenio"] in convenios]
@@ -306,34 +308,36 @@ def main():
     if cupos:
         impacto = []
         for (convenio, cuenta, vence), original in detecciones.items():
-            semana = lunes(original.date())
-            if semana not in cupos:
+            dia = original.date()
+            mes = dia.replace(day=1)
+            if mes not in cupos or dia.day > 7:
                 continue
             nueva = detecciones_cupo.get((convenio, cuenta, vence))
             if nueva is None:
                 estado_cupo = "sin detección posterior observable"
-            elif lunes(nueva.date()) > semana:
-                estado_cupo = "detectada en una semana posterior"
+            elif nueva.date() > mes + timedelta(days=6):
+                estado_cupo = "detectada después del día 7"
             else:
-                estado_cupo = "detectada en la misma semana"
+                estado_cupo = "detectada a más tardar el día 7"
             impacto.append({
-                "semana": semana, "convenio": convenio, "cuenta": cuenta, "vencimiento": vence,
+                "mes": mes, "convenio": convenio, "cuenta": cuenta, "vencimiento": vence,
                 "deteccion_monitor": original.isoformat(),
                 "deteccion_cupo": nueva.isoformat() if nueva else None,
                 "estado": estado_cupo,
             })
         guardar(args.salida / "impacto_deteccion_cupo.csv", impacto,
-                ["semana", "convenio", "cuenta", "vencimiento", "deteccion_monitor", "deteccion_cupo", "estado"])
+                ["mes", "convenio", "cuenta", "vencimiento", "deteccion_monitor", "deteccion_cupo", "estado"])
         guardar(args.salida / "controles_diarios_cupo.csv", controles_cupo)
         guardar(args.salida / "consultas_omitidas_cupo.csv", omitidas_cupo, columnas_omitidas)
+        semanas_afectadas = {lunes(mes + timedelta(days=i)) for mes in cupos for i in range(7)}
         for fila in resumen:
             semana = fila["semana"]
-            if semana not in cupos:
-                continue
-            print(f"Semana de contingencia {semana}: {fila['consultas_cupo']} consultas, "
-                  f"{fila['pagos']} pagos, ratio {fila['ratio_cupo']}")
-            estados = Counter(r["estado"] for r in impacto if r["semana"] == semana)
-            print("Deudas detectadas por el monitor en esa semana:", dict(estados))
+            if semana in semanas_afectadas:
+                print(f"Semana {semana}: {fila['consultas_cupo']} consultas, "
+                      f"{fila['pagos']} pagos, ratio {fila['ratio_cupo']}")
+        for mes in sorted(cupos):
+            estados = Counter(r["estado"] for r in impacto if r["mes"] == mes)
+            print(f"Detecciones del monitor del 1 al 7 de {mes:%Y-%m}:", dict(estados))
 
     total_pagos = sum(por_semana[s] for s in semanas)
     for nombre, _ in escenarios:

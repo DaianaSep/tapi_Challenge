@@ -27,17 +27,19 @@ Aceptaría probar intervalos mayores en un piloto acotado y medir el tiempo entr
 
 Si DeltaPay acepta lotes y cuenta por llamada, **hasta cinco cuentas por lote** llevarían el ratio a **2,01** y el cumplimiento a **11 de 12 semanas**. Pagar de inmediato las facturas autorizadas al detectarlas llevaría el ratio a **4,10**, con **9 de 12 semanas**. Estimé ambas opciones por separado, excluyendo errores y *timeouts*.
 
-### Contingencia en la semana que contiene el día 1
+### Contingencia del 1 al 7 de cada mes
 
-La ventana va del lunes al domingo de la semana que contiene el **día 1 de cada mes**, aunque empiece en el mes anterior. Operaciones decide si activa el cupo y cuántas búsquedas autoriza, incluidas las de Luz. El respaldo de deudas conocidas y la revalidación conservan sus reglas.
+Operaciones decide si activa un cupo de búsquedas del **día 1 al 7 inclusive**, aunque la ventana cruce dos semanas. El cupo incluye Luz y se reparte entre los siete días. El respaldo de deudas conocidas y la revalidación mantienen sus reglas. El ratio se sigue midiendo de lunes a domingo.
 
-| Mes | Semana elegible | Decisión en la simulación |
-|---|---|---|
-| Agosto | 27 de julio–2 de agosto | Semana incompleta en el histórico |
-| Septiembre | 31 de agosto–6 de septiembre | Cupo de 200 búsquedas |
-| Octubre | 28 de septiembre–4 de octubre | Sin cupo. El monitor ya estaba dentro del límite |
+Probé cupos de 40 búsquedas en agosto, 200 en septiembre y 210 en octubre. Los cupos son valores de simulación. Se mantienen las fechas históricas de pago y se excluyen errores y timeouts.
 
-Con el cupo de 200, la semana de inicio de septiembre pasó de **8,98 a 5,93** (237 consultas computables y 40 pagos). La semana siguiente subió de **5,59 a 6,20** y el período quedó en **9 de 12 semanas** dentro del límite. De las 29 facturas que el monitor detectaba en la semana con cupo, 13 se detectaron esa semana y 16 más adelante. La simulación mantiene fijas las fechas de pago y excluye errores y timeouts.
+| Semana desde | Ratio del monitor | Ratio con cupo |
+|---|---:|---:|
+| 3 de agosto | 39,75 | 28,00 |
+| 31 de agosto | 8,98 | 6,60 |
+| 5 de octubre | 9,17 | 8,07 |
+
+El ratio acumulado bajó de 4,16 a 3,97 y se mantuvieron 9 de 12 semanas dentro del límite. En agosto y octubre, las semanas con pocos pagos incluyen días posteriores al 7. Entre las facturas detectadas por el monitor del día 1 al 7, 77 se detectaron después del día 7 y 14 quedaron sin detección observable con los cupos.
 
 ## Email to DeltaPay
 
