@@ -32,20 +32,6 @@ Aceptaría probar intervalos mayores en un piloto acotado y medir el tiempo entr
 
 Si DeltaPay acepta lotes y cuenta por llamada, **hasta cinco cuentas por lote** llevarían el ratio a **2,01** y el cumplimiento a **11 de 12 semanas**. Pagar de inmediato las facturas autorizadas al detectarlas llevaría el ratio a **4,10**, con **9 de 12 semanas**. Estimé ambas opciones por separado, excluyendo errores y *timeouts*.
 
-### Seguimiento reforzado y cupo de contingencia
-
-Del **1 al 7 de cada mes**, el monitor marca para revisión los días en que el ratio acumulado de la semana llega a 5 o hay consultas sin pagos. La medición sigue siendo de lunes a domingo. Operaciones revisa las consultas y pagos observados y decide si aprueba un cupo para las búsquedas programadas pendientes desde el día de aprobación hasta el domingo. El cupo incluye Luz y preserva el respaldo de deudas conocidas y la revalidación antes del pago.
-
-Para un mes nuevo uso el histórico como referencia y los datos de la semana en curso para decidir. Por ejemplo, el 1 de noviembre de 2026 corresponde a la semana que cierra ese domingo. Una aprobación entre el 2 y el 7 rige hasta el domingo 8. Con cero pagos, el ratio queda indefinido y la señal de revisión es la acumulación de consultas.
-
-| Semana desde | Aprobación simulada | Cupo restante | Ratio sin cupo | Ratio con cupo |
-|---|---|---:|---:|---:|
-| 3 de agosto | 4 de agosto | 5 | 39,75 | **6,00** |
-| 31 de agosto | 3 de septiembre | 70 | 8,98 | **5,75** |
-| 5 de octubre | 6 de octubre | 140 | 9,17 | **5,93** |
-
-En la simulación, las tres semanas llegaron al límite o quedaron por debajo y el período pasó de 9 a **11 de 12 semanas** dentro del límite. La semana del 7 de septiembre subió a **6,38**. Entre las facturas que el monitor detectaba desde cada aprobación hasta el domingo, 91 se detectaron en semanas posteriores y 7 quedaron sin detección observable. Los importes de los cupos son ejemplos retrospectivos. La simulación conserva las fechas de pago y excluye errores y timeouts.
-
 ## Email to DeltaPay
 
 Hi Mariana,
@@ -804,4 +790,35 @@ tabla_inmediato = pd.DataFrame(resumen_inmediato, columns=[
     "Frecuencia", "Momento del pago", "Consultas", "Pagos", "Ratio", "Semanas ≤ 6"])
 display(tabla_inmediato.round(2))
 display(pd.concat(detalle_inmediato, ignore_index=True).round(2))
+```
+
+### Seguimiento reforzado y cupo de contingencia
+
+Del **1 al 7 de cada mes**, el monitor marca para revisión los días en que el ratio acumulado de la semana llega a 5 o hay consultas sin pagos. La medición sigue siendo de lunes a domingo. Operaciones revisa las consultas y pagos observados y decide si aprueba un cupo para las búsquedas programadas pendientes desde el día de aprobación hasta el domingo. El cupo incluye Luz y preserva el respaldo de deudas conocidas y la revalidación antes del pago.
+
+Para un mes nuevo uso el histórico como referencia y los datos de la semana en curso para decidir. Por ejemplo, el 1 de noviembre de 2026 corresponde a la semana que cierra ese domingo. Una aprobación entre el 2 y el 7 rige hasta el domingo 8. Con cero pagos, el ratio queda indefinido y la señal de revisión es la acumulación de consultas.
+
+| Semana desde | Aprobación simulada | Cupo restante | Ratio sin cupo | Ratio con cupo |
+|---|---|---:|---:|---:|
+| 3 de agosto | 4 de agosto | 5 | 39,75 | **6,00** |
+| 31 de agosto | 3 de septiembre | 70 | 8,98 | **5,75** |
+| 5 de octubre | 6 de octubre | 140 | 9,17 | **5,93** |
+
+En la simulación, las tres semanas llegaron al límite o quedaron por debajo y el período pasó de 9 a **11 de 12 semanas** dentro del límite. La semana del 7 de septiembre subió a **6,38**. Entre las facturas que el monitor detectaba desde cada aprobación hasta el domingo, 91 se detectaron en semanas posteriores y 7 quedaron sin detección observable. Los importes de los cupos son ejemplos retrospectivos. La simulación conserva las fechas de pago y excluye errores y timeouts.
+
+#### Query para comparar el impacto semanal
+
+El paso 11 del Colab genera `resultados_cupo/resumen_semanal.csv`. Consulté ese archivo para comparar cada semana con y sin cupo, incluida la semana posterior a cada aprobación.
+
+```sql
+SELECT
+    semana,
+    pagos,
+    consultas_monitor AS consultas_sin_cupo,
+    consultas_cupo AS consultas_con_cupo,
+    ROUND(ratio_monitor, 2) AS ratio_sin_cupo,
+    ROUND(ratio_cupo, 2) AS ratio_con_cupo,
+    cumple_cupo AS cumple_limite
+FROM read_csv_auto('resultados_cupo/resumen_semanal.csv')
+ORDER BY semana;
 ```
