@@ -38,7 +38,7 @@ Hi Mariana,
 
 Thanks for flagging this. Before December 1, we’ll run a pilot to reduce the number of bill lookups. We’ll check for new bills less often, depending on the service and the time of the month. Once we find a bill, we’ll pause routine checks for that account and confirm the current amount due right before paying it.
 
-During the pilot, we’ll track how many lookups we make per payment each week and check that bills are still paid on time. We’ll share an initial update before the new limit takes effect.
+During the pilot, we’ll automatically track the weekly lookup-to-payment ratio so we can adjust how often we check for bills if we’re at risk of exceeding the limit. We’ll also monitor whether bills are still paid on time. We’ll share an initial update before the new limit takes effect.
 
 We’re also exploring batch lookups so we can check multiple accounts in a single request. Could you confirm whether DeltaPay supports batch lookups and whether you count one lookup per batch or one per account?
 
