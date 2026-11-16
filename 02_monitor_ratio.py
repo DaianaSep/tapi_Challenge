@@ -14,6 +14,9 @@ porque en ese caso el ratio queda indefinido.
 Cupo de contingencia: del 1 al 7, si el ratio llega a 5 o hay consultas
 sin pagos, Operaciones puede aprobar un cupo para las búsquedas programadas
 pendientes hasta el domingo. El cupo se aplica solo con esa aprobación.
+
+Margen semanal: 6 × pagos acumulados menos consultas computables. Un valor
+negativo indica exceso. Con cero pagos, el margen se deja vacío.
 """
 import argparse
 import csv
@@ -86,6 +89,7 @@ def simular(eventos, excluir_fallos, ajustar=False, cupos=None):
         semana = lunes(dia)
         q, p = consultas[semana], pagos[semana]
         ratio = q / p if p else None
+        margen_consultas = LIMITE * p - q if p else None
         if not p:
             nivel = "escalar" if q else "sin actividad"
         elif ratio >= LIMITE:
@@ -95,7 +99,8 @@ def simular(eventos, excluir_fallos, ajustar=False, cupos=None):
         aplicar = ajustar and ratio is not None and ratio >= ALERTA
         controles.append({
             "fecha": dia, "semana": semana, "consultas": q, "pagos": p,
-            "ratio": ratio, "nivel": nivel, "ajuste_activo": aplicar,
+            "ratio": ratio, "margen_consultas": margen_consultas,
+            "nivel": nivel, "ajuste_activo": aplicar,
             "revision_reforzada": dia.day <= 7,
             "revisar_cupo": dia.day <= 7 and (nivel in {"preventiva", "límite alcanzado", "escalar"}),
             "cupo_busquedas_dia": cupos_diarios.get(dia),
