@@ -26,21 +26,31 @@ El ajuste suma 24 h al intervalo mínimo de búsqueda programada cuando la últi
 
 ## Cómo correrlo
 
-En [Google Colab](https://colab.research.google.com/github/DaianaSep/tapi_Challenge/blob/main/03_ejecutar_monitor.ipynb), ejecutá la única celda para descargar los datos, reproducir la simulación con los tres cupos y generar los siete CSV en `tapi_monitor/resultados_cupo/`.
+**En Google Colab.** Abrí el [notebook de ejecución](https://colab.research.google.com/github/DaianaSep/tapi_Challenge/blob/main/03_ejecutar_monitor.ipynb) y ejecutá la única celda. En una corrida se generan los resultados del monitor sin cupo y con los tres cupos simulados. La celda muestra el ratio semanal de ambos escenarios y una muestra del margen diario. Los siete CSV quedan en **Archivos → `tapi_monitor` → `resultados_cupo`**.
 
-Desde la raíz del repositorio de GitHub, con Python 3:
+**En local.** Desde la raíz del repositorio, con Python 3, elegí el comando según el escenario:
 
 ```bash
+# Monitor con ajuste preventivo, sin cupo
 python3 02_monitor_ratio.py --datos . --salida resultados_monitor
-python3 02_monitor_ratio.py --datos . --contar-fallos --salida resultados_con_fallos
+
+# Comparación del monitor sin cupo y con los tres cupos simulados
+python3 02_monitor_ratio.py --datos . --salida resultados_cupo \
+  --aprobar-cupo 2026-08-04=5 \
+  --aprobar-cupo 2026-09-03=70 \
+  --aprobar-cupo 2026-10-06=140
 ```
 
-Si los CSV están en `data/` junto al script, se puede omitir `--datos`. La simulación registra los avisos en CSV. Para un piloto habría que conectar el control diario al programador de consultas y al canal de avisos de Operaciones.
+Agregá `--contar-fallos` al comando elegido para incluir errores y timeouts. Si los CSV están en `data/` junto al script, podés omitir `--datos .`.
 
-- `controles_diarios.csv` guarda consultas, pagos, ratio, nivel de alerta y si se activó el ajuste. Tanto este archivo como `controles_diarios_cupo.csv` incluyen `margen_consultas`, calculado como 6 × pagos acumulados − consultas computables. Un valor negativo indica exceso. Con cero pagos, queda vacío. El margen orienta la decisión de Operaciones sobre el cupo.
-- `consultas_omitidas.csv` identifica cada intento omitido por el calendario, deuda conocida o ajuste preventivo.
-- `resumen_semanal.csv` compara el histórico, la propuesta y la propuesta con ajuste.
-- `impacto_deteccion.csv` registra cambios en la primera detección frente a la propuesta.
+| Archivo | Qué muestra |
+|---|---|
+| `resumen_semanal.csv` | Histórico, propuesta y monitor con ajuste preventivo (`ratio_monitor`). Al simular cupos, agrega `ratio_cupo`. |
+| `controles_diarios.csv` y `controles_diarios_cupo.csv` | Alertas, ratio acumulado, ajuste y margen semanal por día. El segundo agrega el escenario con cupo. |
+| `consultas_omitidas.csv` y `consultas_omitidas_cupo.csv` | Consultas omitidas y motivo, con el detalle del cupo en el segundo archivo. |
+| `impacto_deteccion.csv` y `impacto_deteccion_cupo.csv` | Cambios en las detecciones por el ajuste preventivo y por el cupo, respectivamente. |
+
+`margen_consultas` se calcula como 6 × pagos acumulados − consultas computables. Un valor negativo indica exceso. Con cero pagos, queda vacío. En un piloto habría que conectar el control diario al programador de consultas y al canal de avisos de Operaciones.
 
 ## Seguimiento reforzado y cupo de contingencia
 
