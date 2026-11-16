@@ -10,6 +10,7 @@ En las 12 semanas completas del 3 de agosto al 25 de octubre de 2026, DeltaPay s
 
 - **Durante la búsqueda de deuda**, usar 48 h para Luz, 72 h para TV y 96 h para Agua, Gas y Teléfono del día 1 al 14. Desde el día 15, usar 48 h para todos. Las semanas con pocos pagos motivaron probar un intervalo mayor al inicio del mes.
 - **Al detectar la factura**, guardar el importe y el vencimiento, pausar las consultas de rutina y hacer una consulta de respaldo si sigue pendiente cerca del vencimiento. Confirmar el saldo antes de pagar y reanudar la búsqueda de la próxima factura tras confirmar el pago.
+- **Ante riesgo de superar el límite semanal**, reforzar el seguimiento del 1 al 7 de cada mes. Si el ratio acumulado llega a 5 o se acumulan consultas sin pagos, Operaciones puede aprobar un cupo para las búsquedas programadas pendientes desde ese día hasta el domingo.
 
 ### Impacto estimado
 
