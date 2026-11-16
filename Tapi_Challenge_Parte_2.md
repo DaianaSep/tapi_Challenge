@@ -25,6 +25,8 @@ El ajuste suma 24 h al intervalo mínimo de búsqueda programada cuando la últi
 
 ## Cómo correrlo
 
+En [Google Colab](https://colab.research.google.com/github/DaianaSep/tapi_Challenge/blob/main/03_ejecutar_monitor.ipynb), ejecutá la única celda para descargar los datos, reproducir la simulación con los tres cupos y generar los siete CSV en `tapi_monitor/resultados_cupo/`.
+
 Desde la raíz del repositorio de GitHub, con Python 3:
 
 ```bash
@@ -34,7 +36,7 @@ python3 02_monitor_ratio.py --datos . --contar-fallos --salida resultados_con_fa
 
 Si los CSV están en `data/` junto al script, se puede omitir `--datos`. La simulación registra los avisos en CSV. Para un piloto habría que conectar el control diario al programador de consultas y al canal de avisos de Operaciones.
 
-- `controles_diarios.csv` guarda consultas, pagos, ratio, nivel de alerta y si se activó el ajuste.
+- `controles_diarios.csv` guarda consultas, pagos, ratio, nivel de alerta y si se activó el ajuste. Tanto este archivo como `controles_diarios_cupo.csv` incluyen `margen_consultas`, calculado como 6 × pagos acumulados − consultas computables. Un valor negativo indica exceso. Con cero pagos, queda vacío. El margen orienta la decisión de Operaciones sobre el cupo.
 - `consultas_omitidas.csv` identifica cada intento omitido por el calendario, deuda conocida o ajuste preventivo.
 - `resumen_semanal.csv` compara el histórico, la propuesta y la propuesta con ajuste.
 - `impacto_deteccion.csv` registra cambios en la primera detección frente a la propuesta.
@@ -51,7 +53,7 @@ Para un mes nuevo uso el histórico como referencia y los datos de la semana en 
 | 31 de agosto | 3 de septiembre | 70 | 8,98 | **5,75** |
 | 5 de octubre | 6 de octubre | 140 | 9,17 | **5,93** |
 
-En la simulación, las tres semanas llegaron al límite o quedaron por debajo y el período pasó de 9 a **11 de 12 semanas** dentro del límite. La semana del 7 de septiembre subió a **6,38**. Entre las facturas que el monitor detectaba desde cada aprobación hasta el domingo, 91 se detectaron en semanas posteriores y 7 quedaron sin detección observable. Los importes de los cupos son ejemplos retrospectivos. La simulación conserva las fechas de pago y excluye errores y timeouts.
+En la simulación, las tres semanas llegaron al límite o quedaron por debajo y el ratio del período bajó de **4,16 a 3,90** y el cumplimiento pasó de 9 a **11 de 12 semanas**. La semana del 7 de septiembre subió a **6,38**. Entre las facturas que el monitor detectaba desde cada aprobación hasta el domingo, 91 se detectaron en semanas posteriores y 7 quedaron sin detección observable. Los importes de los cupos son ejemplos retrospectivos. La simulación conserva las fechas de pago y excluye errores y timeouts.
 
 ```bash
 python3 02_monitor_ratio.py --datos . --aprobar-cupo 2026-08-04=5 --aprobar-cupo 2026-09-03=70 --aprobar-cupo 2026-10-06=140
