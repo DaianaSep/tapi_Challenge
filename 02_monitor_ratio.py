@@ -10,6 +10,10 @@ Umbrales: con ratio de 5 o más se aplica el ajuste preventivo. El 5 deja
 una consulta por pago de margen antes del límite de 6. Si supera 6,
 se escala a Operaciones. También se escala si hay consultas y cero pagos,
 porque en ese caso el ratio queda indefinido.
+
+Cupo de contingencia: del 1 al 7, si el ratio llega a 5 o hay consultas
+sin pagos, Operaciones puede aprobar un cupo para las búsquedas programadas
+pendientes hasta el domingo. El cupo se aplica solo con esa aprobación.
 """
 import argparse
 import csv
