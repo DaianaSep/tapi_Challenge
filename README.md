@@ -9,6 +9,8 @@
 
 ## Ejecutar la simulación
 
+La forma más rápida es [abrir el Colab del monitor](https://colab.research.google.com/github/DaianaSep/tapi_Challenge/blob/main/03_ejecutar_monitor.ipynb) y ejecutar la única celda. Compara el monitor con y sin cupo y deja los siete CSV en `tapi_monitor/resultados_cupo/`.
+
 Desde la raíz del repositorio, con Python 3:
 
 ```bash
@@ -16,7 +18,7 @@ python3 02_monitor_ratio.py --datos . --salida resultados_monitor
 python3 02_monitor_ratio.py --datos . --contar-fallos --salida resultados_con_fallos
 ```
 
-El script genera los controles diarios, las consultas omitidas y el resumen semanal.
+El script genera controles diarios, consultas omitidas, impacto en la detección y un resumen semanal. La [Parte 2](Tapi_Challenge_Parte_2.md#cómo-correrlo) explica cómo leer cada archivo.
 
 ## Contingencia de inicio de mes
 
