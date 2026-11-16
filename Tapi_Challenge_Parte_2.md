@@ -19,7 +19,8 @@ El monitor calcula al inicio de cada día el ratio de la semana en curso, de lun
 | Ratio menor a 5 | Continuar con el calendario de la Parte 1. |
 | Ratio de 5 a menos de 6 | Activar el ajuste preventivo y registrar la alerta. El umbral deja una consulta por pago de margen frente al límite de 6. |
 | Ratio igual a 6 | Mantener el ajuste y registrar que se alcanzó el límite. |
-| Ratio superior a 6 o consultas sin pagos | Registrar el caso para Operaciones. Con ratio superior a 6 se mantiene el ajuste. Con cero pagos el ratio queda indefinido y se conserva el calendario base. |
+| Ratio superior a 6 o consultas sin pagos | Registrar el caso para Operaciones. Con ratio superior a 6 se mantiene el ajuste. Con cero pagos el ratio queda indefinido y se conserva el calendario base, sujeto al cupo que apruebe Operaciones. |
+| Del 1 al 7 del mes, ratio de 5 o más o consultas sin pagos | Marcar el caso para revisión. Operaciones puede usar el margen semanal para decidir si aprueba un cupo para las búsquedas programadas pendientes desde ese día hasta el domingo. |
 
 El ajuste suma 24 h al intervalo mínimo de búsqueda programada cuando la última respuesta fue sin deuda. Luz, las consultas de respaldo y la revalidación previa al pago conservan su tratamiento. Al siguiente control se vuelve al calendario base si el ratio baja de 5 o comienza una semana nueva. La simulación solo puede ejecutar el siguiente intento disponible en los CSV, así que 24 h describe el aumento del intervalo mínimo y la demora efectiva puede ser mayor.
 
