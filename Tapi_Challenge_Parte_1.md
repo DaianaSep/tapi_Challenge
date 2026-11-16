@@ -22,6 +22,8 @@ En las 12 semanas completas del 3 de agosto al 25 de octubre de 2026, DeltaPay s
 | Monitor con ajuste preventivo, sin errores ni *timeouts* | 4,16 | 9 de 12 |
 | Monitor con ajuste preventivo y cupos aprobados, sin errores ni *timeouts* | **3,90** | **11 de 12** |
 
+**Ajuste preventivo del monitor.** Si al inicio del día el ratio semanal acumulado llega a **5**, el monitor suma automáticamente **24 h al intervalo mínimo** de las búsquedas programadas cuya última respuesta fue «sin deuda». La frecuencia de Luz, las consultas de respaldo y la revalidación antes del pago conservan sus reglas. El cupo de contingencia requiere aprobación de Operaciones. En los escenarios «sin errores ni *timeouts*», esas consultas se excluyen del numerador del ratio como supuesto de la simulación.
+
 La propuesta reduce de **34.602 a 6.002** las consultas computadas al contar todos los intentos, incluida una revalidación por pago. Con el supuesto de excluir fallos, las tres semanas que superaron 6 tuvieron entre **8 y 42 pagos**, frente a **76–172** en las que cumplieron.
 
 Con el **cupo de contingencia**, el ratio bajó de **4,16 a 3,90** frente al mismo monitor sin cupo y dos semanas más quedaron dentro del límite. La simulación usa cupos elegidos retrospectivamente y mantiene las fechas de pago históricas. El [detalle de la contingencia](#seguimiento-reforzado-y-cupo-de-contingencia) muestra el resultado por semana y el efecto sobre las detecciones.
