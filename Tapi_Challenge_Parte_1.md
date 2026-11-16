@@ -18,8 +18,12 @@ En las 12 semanas completas del 3 de agosto al 25 de octubre de 2026, DeltaPay s
 | Histórico, todos los intentos | 25,76 | 0 de 12 |
 | Propuesta, todos los intentos | 4,47 | 7 de 12 |
 | Propuesta, sin errores ni *timeouts* | 4,23 | 9 de 12 |
+| Monitor con ajuste preventivo, sin errores ni *timeouts* | 4,16 | 9 de 12 |
+| Monitor con ajuste preventivo y cupos aprobados, sin errores ni *timeouts* | **3,90** | **11 de 12** |
 
 La propuesta reduce de **34.602 a 6.002** las consultas computadas al contar todos los intentos, incluida una revalidación por pago. Con el supuesto de excluir fallos, las tres semanas que superaron 6 tuvieron entre **8 y 42 pagos**, frente a **76–172** en las que cumplieron.
+
+Con el **cupo de contingencia**, el ratio bajó de **4,16 a 3,90** frente al mismo monitor sin cupo y dos semanas más quedaron dentro del límite. La simulación usa cupos elegidos retrospectivamente y mantiene las fechas de pago históricas. El [detalle de la contingencia](#seguimiento-reforzado-y-cupo-de-contingencia) muestra el resultado por semana y el efecto sobre las detecciones.
 
 ### Riesgo que aceptaría y opciones a considerar
 
